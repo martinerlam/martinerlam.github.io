@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interactive Wireframe Tubes</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #0b0b0b;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+  <style>
+    
+  </style>
+  <style>
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.6);
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 12px;
+    }
+    .controls label {
+      display: block;
+      margin-bottom: 6px;
+    }
+    .controls input {
+      width: 160px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="controls">
+    <label>Packing 
+      <select id="packing">
+        <option value="grid">Grid</option>
+        <option value="hex">Hex</option>
+      </select>
+    </label>
+    <label>Mode 
+      <select id="renderMode">
+        <option value="wire">Wireframe</option>
+        <option value="solid">Solid</option>
+      </select>
+    </label>
+    <label>X Rotation <input id="rotX" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+    <label>Y Rotation <input id="rotY" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+    <label>Z Rotation <input id="rotZ" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+    <label>Scale <input id="scale" type="range" min="0.2" max="2.5" step="0.01" value="1"></label>
+    <label>Interaction <input id="interaction" type="range" min="0" max="2" step="0.01" value="1"></label>
+    <label>Spacing <input id="spacing" type="range" min="0.2" max="1.5" step="0.01" value="0.5"></label>
+  </div>
+<script type="module">
+  import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+  // Scene setup
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 2, 8);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  document.body.appendChild(renderer.domElement);
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+  dir.position.set(5, 10, 7);
+  scene.add(dir);
+
+  // Light controls (collapsible)
+  const controlsRoot = document.querySelector('.controls');
+
+  const lightingDetails = document.createElement('details');
+  lightingDetails.style.marginTop = '10px';
+
+  const lightingSummary = document.createElement('summary');
+  lightingSummary.textContent = 'Lighting';
+  lightingSummary.style.cursor = 'pointer';
+  lightingSummary.style.userSelect = 'none';
+  lightingSummary.style.marginBottom = '6px';
+
+  lightingDetails.appendChild(lightingSummary);
+  controlsRoot.appendChild(lightingDetails);
+
+  function makeSlider(labelText, min, max, step, value) {
+    const label = document.createElement('label');
+    label.style.display = 'block';
+    label.style.marginTop = '8px';
+
+    const text = document.createElement('span');
+    text.textContent = labelText + ' ';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = String(min);
+    slider.max = String(max);
+    slider.step = String(step);
+    slider.value = String(value);
+    slider.style.width = '160px';
+
+    label.appendChild(text);
+    label.appendChild(slider);
+    lightingDetails.appendChild(label);
+
+    return slider;
+  }
+
+  // Directional light target at origin
+  scene.add(dir.target);
+
+  const lightIntensitySlider = makeSlider('Intensity', 0, 2, 0.01, 1);
+  const lightAzimuthSlider = makeSlider('Azimuth', 0, 360, 1, 35);
+  const lightElevationSlider = makeSlider('Elevation', 0, 90, 1, 55);
+
+  function updateLight() {
+    dir.intensity = parseFloat(lightIntensitySlider.value);
+
+    const az = (parseFloat(lightAzimuthSlider.value) * Math.PI) / 180;
+    const el = (parseFloat(lightElevationSlider.value) * Math.PI) / 180;
+
+    // Larger radius makes direction changes more obvious
+    const r = 16;
+
+    // Spherical coordinates: elevation is angle above the XZ plane
+    const x = r * Math.cos(el) * Math.cos(az);
+    const y = r * Math.sin(el);
+    const z = r * Math.cos(el) * Math.sin(az);
+
+    dir.position.set(x, y, z);
+    dir.target.position.set(0, 0, 0);
+  }
+
+  lightIntensitySlider.addEventListener('input', updateLight);
+  lightAzimuthSlider.addEventListener('input', updateLight);
+  lightElevationSlider.addEventListener('input', updateLight);
+  updateLight();
+
+  // Tube cluster
+  const tubeGroup = new THREE.Group();
+  scene.add(tubeGroup);
+const tubes = [];
+
+  // Slider controls
+  const rotXSlider = document.getElementById('rotX');
+  const rotYSlider = document.getElementById('rotY');
+  const rotZSlider = document.getElementById('rotZ');
+  const scaleSlider = document.getElementById('scale');
+  const interactionSlider = document.getElementById('interaction');
+  const spacingSlider = document.getElementById('spacing');
+  const packingSelect = document.getElementById('packing');
+  const renderModeSelect = document.getElementById('renderMode');
+  const tubeCount = 25;
+
+  const geometry = new THREE.CylinderGeometry(0.15, 0.15, 3, 24, 1, false);
+
+  // Create tube meshes (positions are assigned by layoutTubes)
+  for (let i = 0; i < tubeCount; i++) {
+    // RenderHeads-inspired color palette
+    const palette = [
+      0x3fa7b5, // teal
+      0x00b3b8, // cyan
+      0x1b9e77, // green
+      0x00a6e6, // blue
+      0xf57c00, // orange
+      0xd32f2f, // red
+      0xfbc02d, // yellow
+      0xe91e63, // pink
+      0x8e245d  // purple
+    ];
+
+    const material = new THREE.MeshStandardMaterial({
+      color: palette[i % palette.length],
+      wireframe: true
+    });
+
+    const tube = new THREE.Mesh(geometry, material);
+    tube.position.set(0, 0, 0);
+    tube.rotation.set(0, 0, 0);
+
+    tube.userData = {
+      basePosition: new THREE.Vector3(0, 0, 0),
+      phase: Math.random() * Math.PI * 2,
+      hoverStrength: 0
+    };
+
+    tubes.push(tube);
+    tubeGroup.add(tube);
+  }
+
+  function layoutTubes() {
+    const spacing = parseFloat(spacingSlider.value);
+    const packing = packingSelect.value;
+    const gridSize = Math.ceil(Math.sqrt(tubeCount));
+
+    tubes.forEach((tube, i) => {
+      let x, z;
+
+      if (packing === 'hex') {
+        const row = Math.floor(i / gridSize);
+        const col = i % gridSize;
+        const offset = row % 2 === 0 ? 0 : spacing * 0.5;
+        x = (col - gridSize / 2) * spacing + offset;
+        z = (row - gridSize / 2) * spacing * 0.866; // sqrt(3)/2
+      } else {
+        const col = i % gridSize;
+        const row = Math.floor(i / gridSize);
+        x = (col - gridSize / 2) * spacing;
+        z = (row - gridSize / 2) * spacing;
+      }
+
+      tube.userData.basePosition.set(x, 0, z);
+    });
+  }
+
+  // initial layout
+  layoutTubes();
+
+  // Raycasting for mouse interaction
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  window.addEventListener('mousemove', (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  });
+
+  // Render mode handling
+  function applyRenderMode() {
+    const isWire = renderModeSelect.value === 'wire';
+    tubes.forEach(t => {
+      t.material.wireframe = isWire;
+      t.material.needsUpdate = true;
+    });
+  }
+  renderModeSelect.addEventListener('change', applyRenderMode);
+  // Apply once on load
+  applyRenderMode();
+
+  // Resize handling
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Animation loop
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const globalRotX = parseFloat(rotXSlider.value);
+    const globalRotY = parseFloat(rotYSlider.value);
+    const globalRotZ = parseFloat(rotZSlider.value);
+    const globalScale = parseFloat(scaleSlider.value);
+    const interactionAmount = parseFloat(interactionSlider.value);
+
+    tubeGroup.rotation.set(globalRotX, globalRotY, globalRotZ);
+    tubeGroup.scale.setScalar(globalScale);
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(tubes);
+
+    // Update tubes
+    layoutTubes();
+
+    tubes.forEach(tube => {
+      tube.userData.hoverStrength *= 0.9;
+      tube.userData.phase += 0.03;
+
+      const travel = Math.sin(tube.userData.phase) * tube.userData.hoverStrength * interactionAmount;
+
+      tube.position.copy(tube.userData.basePosition);
+      tube.position.y += travel;
+
+      tube.rotation.y += 0.002;
+    });
+
+    // Hover interaction
+    if (intersects.length > 0) {
+      intersects[0].object.userData.hoverStrength += 0.4;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+</script>
+</body>
+</html>
