@@ -1,9 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!--
+    RenderHeads Tube Bundle
+    Version: v0.7.0
+    Date: 2026-01-20
+    Changes from previous:
+    - Added one button to hide/show BOTH the UI panel and the logo (no other changes)
+  -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interactive Tube Bundle (Up to 100 Tubes)</title>
+  <title>Interactive Tube Bundle v0.7.0 (Up to 100 Tubes)</title>
   <style>
     html, body { margin: 0; padding: 0; overflow: hidden; background: #0b0b0b; }
     canvas { display: block; }
@@ -13,11 +20,30 @@
       position: fixed;
       top: 100px;
       right: 100px;
-      height: 250px;          /* tweak size here */
+      height: 150px;          /* tweak size here */
       width: auto;
       z-index: 10000;
       opacity: 0.95;
       pointer-events: none;  /* won't block hover interaction */
+    }
+
+    /* UI toggle button (top-left) */
+    .uiToggle{
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10001;
+
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
 
     .controls{
@@ -64,6 +90,8 @@
   </style>
 </head>
 <body>
+  <button id="toggleUI" class="uiToggle">Hide UI</button>
+
   <!-- Logo (expects logo.png next to this HTML file) -->
   <img src="logo.png" alt="Logo" class="logo" />
 
@@ -125,6 +153,22 @@
 
   <script type="module">
     (async () => {
+      const APP_VERSION = 'v0.7.0';
+      console.log('RenderHeads Tube Bundle', APP_VERSION);
+
+      // ---- UI toggle (hide/show BOTH UI panel + logo). No other behavior changed. ----
+      const toggleBtn = document.getElementById('toggleUI');
+      const controlsEl = document.querySelector('.controls');
+      const logoEl = document.querySelector('.logo');
+      let uiVisible = true;
+
+      toggleBtn.addEventListener('click', () => {
+        uiVisible = !uiVisible;
+        controlsEl.style.display = uiVisible ? 'block' : 'none';
+        logoEl.style.display = uiVisible ? 'block' : 'none';
+        toggleBtn.textContent = uiVisible ? 'Hide UI' : 'Show UI';
+      });
+
       // Dynamic import so we can show a helpful on-page error if modules are blocked (e.g. file://)
       let THREE;
       try {
