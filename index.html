@@ -2,302 +2,458 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Interactive Wireframe Tubes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Tube Bundle (Up to 100 Tubes)</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #0b0b0b;
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0b0b0b; }
+    canvas { display: block; }
+
+    /* Top-right logo overlay */
+    .logo{
+      position: fixed;
+      top: 100px;
+      right: 100px;
+      height: 250px;          /* tweak size here */
+      width: auto;
+      z-index: 10000;
+      opacity: 0.95;
+      pointer-events: none;  /* won't block hover interaction */
     }
-    canvas {
-      display: block;
-    }
-  </style>
-  <style>
-    
-  </style>
-  <style>
-    .controls {
+
+    .controls{
       position: fixed;
       bottom: 20px;
       left: 20px;
+      width: 280px;
+      max-height: 70vh;
+      overflow: auto;
+
       background: rgba(0,0,0,0.6);
-      padding: 12px 14px;
-      border-radius: 8px;
       color: #fff;
-      font-family: sans-serif;
+      padding: 12px 14px;
+      border-radius: 10px;
+      z-index: 9999;
+
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       font-size: 12px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
-    .controls label {
-      display: block;
-      margin-bottom: 6px;
+    .controls label{ display:block; margin-top:8px; }
+    .controls label:first-child{ margin-top:0; }
+    .controls input[type="range"]{ width: 250px; }
+    .controls select{
+      width: 260px;
+      margin-top: 4px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      padding: 6px 8px;
+      outline: none;
     }
-    .controls input {
-      width: 160px;
+    details{ margin-top:10px; }
+    summary{ cursor:pointer; user-select:none; list-style:none; }
+    summary::-webkit-details-marker{ display:none; }
+    summary::before{ content:"▸ "; opacity:0.9; }
+    details[open] summary::before{ content:"▾ "; }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
   </style>
 </head>
 <body>
-  
+  <!-- Logo (expects logo.png next to this HTML file) -->
+  <img src="logo.png" alt="Logo" class="logo" />
+
   <div class="controls">
-    <label>Packing 
+    <label>
+      Packing
       <select id="packing">
         <option value="grid">Grid</option>
         <option value="hex">Hex</option>
       </select>
     </label>
-    <label>Mode 
+
+    <label>
+      Mode
       <select id="renderMode">
-        <option value="wire">Wireframe</option>
         <option value="solid">Solid</option>
+        <option value="wire">Wireframe</option>
       </select>
     </label>
-    <label>X Rotation <input id="rotX" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
-    <label>Y Rotation <input id="rotY" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
-    <label>Z Rotation <input id="rotZ" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+
     <label>Scale <input id="scale" type="range" min="0.2" max="2.5" step="0.01" value="1"></label>
-    <label>Interaction <input id="interaction" type="range" min="0" max="2" step="0.01" value="1"></label>
     <label>Spacing <input id="spacing" type="range" min="0.2" max="1.5" step="0.01" value="0.5"></label>
+    <label>Interaction <input id="interaction" type="range" min="0" max="2" step="0.01" value="1"></label>
+
+    <!-- Tube diameter -->
+    <label>
+      Diameter
+      <input id="diameter" type="range" min="0.04" max="0.5" step="0.005" value="0.30">
+    </label>
+    <label style="opacity:0.85;">
+      Diameter: <span id="diameterLabel">0.30</span>
+    </label>
+
+    <!-- Tube count (4 → 100) -->
+    <label>
+      Tubes
+      <input id="count" type="range" min="4" max="100" step="1" value="25">
+    </label>
+    <label style="opacity:0.85;">
+      Count: <span id="countLabel">25</span>
+    </label>
+
+    <details>
+      <summary>Rotation</summary>
+      <label>X Rotation <input id="rotX" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+      <label>Y Rotation <input id="rotY" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+      <label>Z Rotation <input id="rotZ" type="range" min="-3.14" max="3.14" step="0.01" value="0"></label>
+    </details>
+
+    <details>
+      <summary>Lighting</summary>
+      <label>Intensity <input id="lightIntensity" type="range" min="0" max="2" step="0.01" value="1"></label>
+      <label>Azimuth <input id="lightAzimuth" type="range" min="0" max="360" step="1" value="35"></label>
+      <label>Elevation <input id="lightElevation" type="range" min="0" max="90" step="1" value="55"></label>
+    </details>
+
+    <label>Sound <input id="soundToggle" type="checkbox" checked style="transform: translateY(2px);"></label>
   </div>
-<script type="module">
-  import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-  // Scene setup
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 2, 8);
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  document.body.appendChild(renderer.domElement);
-
-  // Lighting
-  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-  scene.add(ambient);
-
-  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-  dir.position.set(5, 10, 7);
-  scene.add(dir);
-
-  // Light controls (collapsible)
-  const controlsRoot = document.querySelector('.controls');
-
-  const lightingDetails = document.createElement('details');
-  lightingDetails.style.marginTop = '10px';
-
-  const lightingSummary = document.createElement('summary');
-  lightingSummary.textContent = 'Lighting';
-  lightingSummary.style.cursor = 'pointer';
-  lightingSummary.style.userSelect = 'none';
-  lightingSummary.style.marginBottom = '6px';
-
-  lightingDetails.appendChild(lightingSummary);
-  controlsRoot.appendChild(lightingDetails);
-
-  function makeSlider(labelText, min, max, step, value) {
-    const label = document.createElement('label');
-    label.style.display = 'block';
-    label.style.marginTop = '8px';
-
-    const text = document.createElement('span');
-    text.textContent = labelText + ' ';
-
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.min = String(min);
-    slider.max = String(max);
-    slider.step = String(step);
-    slider.value = String(value);
-    slider.style.width = '160px';
-
-    label.appendChild(text);
-    label.appendChild(slider);
-    lightingDetails.appendChild(label);
-
-    return slider;
-  }
-
-  // Directional light target at origin
-  scene.add(dir.target);
-
-  const lightIntensitySlider = makeSlider('Intensity', 0, 2, 0.01, 1);
-  const lightAzimuthSlider = makeSlider('Azimuth', 0, 360, 1, 35);
-  const lightElevationSlider = makeSlider('Elevation', 0, 90, 1, 55);
-
-  function updateLight() {
-    dir.intensity = parseFloat(lightIntensitySlider.value);
-
-    const az = (parseFloat(lightAzimuthSlider.value) * Math.PI) / 180;
-    const el = (parseFloat(lightElevationSlider.value) * Math.PI) / 180;
-
-    // Larger radius makes direction changes more obvious
-    const r = 16;
-
-    // Spherical coordinates: elevation is angle above the XZ plane
-    const x = r * Math.cos(el) * Math.cos(az);
-    const y = r * Math.sin(el);
-    const z = r * Math.cos(el) * Math.sin(az);
-
-    dir.position.set(x, y, z);
-    dir.target.position.set(0, 0, 0);
-  }
-
-  lightIntensitySlider.addEventListener('input', updateLight);
-  lightAzimuthSlider.addEventListener('input', updateLight);
-  lightElevationSlider.addEventListener('input', updateLight);
-  updateLight();
-
-  // Tube cluster
-  const tubeGroup = new THREE.Group();
-  scene.add(tubeGroup);
-const tubes = [];
-
-  // Slider controls
-  const rotXSlider = document.getElementById('rotX');
-  const rotYSlider = document.getElementById('rotY');
-  const rotZSlider = document.getElementById('rotZ');
-  const scaleSlider = document.getElementById('scale');
-  const interactionSlider = document.getElementById('interaction');
-  const spacingSlider = document.getElementById('spacing');
-  const packingSelect = document.getElementById('packing');
-  const renderModeSelect = document.getElementById('renderMode');
-  const tubeCount = 25;
-
-  const geometry = new THREE.CylinderGeometry(0.15, 0.15, 3, 24, 1, false);
-
-  // Create tube meshes (positions are assigned by layoutTubes)
-  for (let i = 0; i < tubeCount; i++) {
-    // RenderHeads-inspired color palette
-    const palette = [
-      0x3fa7b5, // teal
-      0x00b3b8, // cyan
-      0x1b9e77, // green
-      0x00a6e6, // blue
-      0xf57c00, // orange
-      0xd32f2f, // red
-      0xfbc02d, // yellow
-      0xe91e63, // pink
-      0x8e245d  // purple
-    ];
-
-    const material = new THREE.MeshStandardMaterial({
-      color: palette[i % palette.length],
-      wireframe: true
-    });
-
-    const tube = new THREE.Mesh(geometry, material);
-    tube.position.set(0, 0, 0);
-    tube.rotation.set(0, 0, 0);
-
-    tube.userData = {
-      basePosition: new THREE.Vector3(0, 0, 0),
-      phase: Math.random() * Math.PI * 2,
-      hoverStrength: 0
-    };
-
-    tubes.push(tube);
-    tubeGroup.add(tube);
-  }
-
-  function layoutTubes() {
-    const spacing = parseFloat(spacingSlider.value);
-    const packing = packingSelect.value;
-    const gridSize = Math.ceil(Math.sqrt(tubeCount));
-
-    tubes.forEach((tube, i) => {
-      let x, z;
-
-      if (packing === 'hex') {
-        const row = Math.floor(i / gridSize);
-        const col = i % gridSize;
-        const offset = row % 2 === 0 ? 0 : spacing * 0.5;
-        x = (col - gridSize / 2) * spacing + offset;
-        z = (row - gridSize / 2) * spacing * 0.866; // sqrt(3)/2
-      } else {
-        const col = i % gridSize;
-        const row = Math.floor(i / gridSize);
-        x = (col - gridSize / 2) * spacing;
-        z = (row - gridSize / 2) * spacing;
+  <script type="module">
+    (async () => {
+      // Dynamic import so we can show a helpful on-page error if modules are blocked (e.g. file://)
+      let THREE;
+      try {
+        THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
+      } catch (err) {
+        console.error(err);
+        const msg = document.createElement('div');
+        msg.style.position = 'fixed';
+        msg.style.inset = '20px';
+        msg.style.maxWidth = '780px';
+        msg.style.background = 'rgba(0,0,0,0.78)';
+        msg.style.border = '1px solid rgba(255,255,255,0.2)';
+        msg.style.borderRadius = '14px';
+        msg.style.padding = '16px 18px';
+        msg.style.color = '#fff';
+        msg.style.fontFamily = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial';
+        msg.style.zIndex = '999999';
+        msg.innerHTML = `
+          <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Three.js failed to load</div>
+          <div style="line-height:1.5; opacity:0.95;">
+            If you opened this via <code>file://</code>, run it from a local server instead:<br/>
+            <pre style="background:rgba(255,255,255,0.08); padding:10px; border-radius:10px; overflow:auto;">python3 -m http.server</pre>
+            Then open: <code>http://localhost:8000</code>
+          </div>
+          <div style="margin-top:10px; opacity:0.8; font-size:12px;">Console error: ${String(err).replaceAll('<','&lt;')}</div>
+        `;
+        document.body.appendChild(msg);
+        return;
       }
 
-      tube.userData.basePosition.set(x, 0, z);
-    });
-  }
+      // --- Scene setup ---
+      const scene = new THREE.Scene();
 
-  // initial layout
-  layoutTubes();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(0, 2.2, 9);
+      camera.lookAt(0, 0, 0);
 
-  // Raycasting for mouse interaction
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      document.body.appendChild(renderer.domElement);
 
-  window.addEventListener('mousemove', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  });
+      // --- Lighting ---
+      const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+      scene.add(ambient);
 
-  // Render mode handling
-  function applyRenderMode() {
-    const isWire = renderModeSelect.value === 'wire';
-    tubes.forEach(t => {
-      t.material.wireframe = isWire;
-      t.material.needsUpdate = true;
-    });
-  }
-  renderModeSelect.addEventListener('change', applyRenderMode);
-  // Apply once on load
-  applyRenderMode();
+      const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+      scene.add(dir);
+      scene.add(dir.target);
 
-  // Resize handling
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+      // --- DOM controls ---
+      const packingSelect = document.getElementById('packing');
+      const renderModeSelect = document.getElementById('renderMode');
+      const scaleSlider = document.getElementById('scale');
+      const spacingSlider = document.getElementById('spacing');
+      const interactionSlider = document.getElementById('interaction');
 
-  // Animation loop
-  function animate() {
-    requestAnimationFrame(animate);
+      const diameterSlider = document.getElementById('diameter');
+      const diameterLabel = document.getElementById('diameterLabel');
 
-    const globalRotX = parseFloat(rotXSlider.value);
-    const globalRotY = parseFloat(rotYSlider.value);
-    const globalRotZ = parseFloat(rotZSlider.value);
-    const globalScale = parseFloat(scaleSlider.value);
-    const interactionAmount = parseFloat(interactionSlider.value);
+      const countSlider = document.getElementById('count');
+      const countLabel = document.getElementById('countLabel');
 
-    tubeGroup.rotation.set(globalRotX, globalRotY, globalRotZ);
-    tubeGroup.scale.setScalar(globalScale);
+      const rotXSlider = document.getElementById('rotX');
+      const rotYSlider = document.getElementById('rotY');
+      const rotZSlider = document.getElementById('rotZ');
 
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(tubes);
+      const lightIntensitySlider = document.getElementById('lightIntensity');
+      const lightAzimuthSlider = document.getElementById('lightAzimuth');
+      const lightElevationSlider = document.getElementById('lightElevation');
 
-    // Update tubes
-    layoutTubes();
+      const soundToggle = document.getElementById('soundToggle');
+      let soundEnabled = soundToggle.checked;
+      soundToggle.addEventListener('change', () => { soundEnabled = soundToggle.checked; });
 
-    tubes.forEach(tube => {
-      tube.userData.hoverStrength *= 0.9;
-      tube.userData.phase += 0.03;
+      // --- Tube bundle ---
+      const tubeGroup = new THREE.Group();
+      scene.add(tubeGroup);
 
-      const travel = Math.sin(tube.userData.phase) * tube.userData.hoverStrength * interactionAmount;
+      const tubes = [];
+      let tubeCount = parseInt(countSlider.value, 10);
+      countLabel.textContent = String(tubeCount);
 
-      tube.position.copy(tube.userData.basePosition);
-      tube.position.y += travel;
+      // Diameter is applied by scaling X/Z on each tube (fast, no rebuild needed)
+      let tubeDiameter = parseFloat(diameterSlider.value);
+      diameterLabel.textContent = tubeDiameter.toFixed(2);
 
-      tube.rotation.y += 0.002;
-    });
+      // RenderHeads-inspired palette (approx)
+      const palette = [
+        0x3fa7b5, // teal
+        0x00b3b8, // cyan
+        0x1b9e77, // green
+        0x00a6e6, // blue
+        0xf57c00, // orange
+        0xd32f2f, // red
+        0xfbc02d, // yellow
+        0xe91e63, // pink
+        0x8e245d  // purple
+      ];
 
-    // Hover interaction
-    if (intersects.length > 0) {
-      intersects[0].object.userData.hoverStrength += 0.4;
-    }
+      // Shared geometry (radius=1, we scale to desired diameter). Height=3. End caps enabled.
+      const geometry = new THREE.CylinderGeometry(1, 1, 3, 24, 1, false);
 
-    renderer.render(scene, camera);
-  }
+      function applyRenderMode() {
+        const isWire = renderModeSelect.value === 'wire';
+        for (const t of tubes) {
+          t.material.wireframe = isWire;
+          t.material.needsUpdate = true;
+        }
+      }
 
-  animate();
-</script>
+      function applyDiameter() {
+        const radiusScale = tubeDiameter / 2;
+        for (const t of tubes) {
+          t.scale.x = radiusScale;
+          t.scale.z = radiusScale;
+        }
+      }
+
+      function layoutTubes() {
+        const spacing = parseFloat(spacingSlider.value);
+        const packing = packingSelect.value;
+        const gridSize = Math.ceil(Math.sqrt(tubeCount));
+
+        for (let i = 0; i < tubes.length; i++) {
+          const tube = tubes[i];
+          let x, z;
+
+          if (packing === 'hex') {
+            const row = Math.floor(i / gridSize);
+            const col = i % gridSize;
+            const offset = (row % 2 === 0) ? 0 : spacing * 0.5;
+            x = (col - gridSize / 2) * spacing + offset;
+            z = (row - gridSize / 2) * spacing * 0.866; // sqrt(3)/2
+          } else {
+            const col = i % gridSize;
+            const row = Math.floor(i / gridSize);
+            x = (col - gridSize / 2) * spacing;
+            z = (row - gridSize / 2) * spacing;
+          }
+
+          tube.userData.basePosition.set(x, 0, z);
+        }
+      }
+
+      function rebuildTubes(newCount) {
+        tubeCount = Math.max(4, Math.min(100, newCount | 0));
+        countSlider.value = String(tubeCount);
+        countLabel.textContent = String(tubeCount);
+
+        // Dispose old materials + remove old meshes (geometry is shared)
+        for (const t of tubes) {
+          if (t.material) t.material.dispose();
+          tubeGroup.remove(t);
+        }
+        tubes.length = 0;
+
+        for (let i = 0; i < tubeCount; i++) {
+          const material = new THREE.MeshStandardMaterial({
+            color: palette[i % palette.length],
+            roughness: 0.5,
+            metalness: 0.05,
+            wireframe: renderModeSelect.value === 'wire'
+          });
+
+          const tube = new THREE.Mesh(geometry, material);
+          tube.position.set(0, 0, 0);
+          tube.rotation.set(0, 0, 0);
+
+          tube.userData = {
+            idx: i,
+            basePosition: new THREE.Vector3(0, 0, 0),
+            phase: Math.random() * Math.PI * 2,
+            hoverStrength: 0
+          };
+
+          tubes.push(tube);
+          tubeGroup.add(tube);
+        }
+
+        applyRenderMode();
+        applyDiameter();
+        layoutTubes();
+      }
+
+      function updateLight() {
+        dir.intensity = parseFloat(lightIntensitySlider.value);
+
+        const az = (parseFloat(lightAzimuthSlider.value) * Math.PI) / 180;
+        const el = (parseFloat(lightElevationSlider.value) * Math.PI) / 180;
+        const r = 18;
+
+        const x = r * Math.cos(el) * Math.cos(az);
+        const y = r * Math.sin(el);
+        const z = r * Math.cos(el) * Math.sin(az);
+
+        dir.position.set(x, y, z);
+        dir.target.position.set(0, 0, 0);
+      }
+
+      // --- Raycasting ---
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      window.addEventListener('mousemove', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      });
+
+      // --- Audio (Option C: only when hovered tube changes) ---
+      let audioCtx = null;
+      let lastHovered = null;
+
+      function ensureAudio() {
+        if (!soundEnabled) return null;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        if (!audioCtx) {
+          try { audioCtx = new AC(); }
+          catch (e) { console.warn('AudioContext init failed:', e); return null; }
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        return audioCtx;
+      }
+
+      // First click/tap enables audio (browser policy)
+      window.addEventListener('pointerdown', () => ensureAudio(), { once: true });
+
+      function playTone(tube) {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== 'running') return;
+
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        const freq = 220 + (tube.userData.idx % 24) * 18;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.07, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.14);
+      }
+
+      // --- Resize ---
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // --- Initial state ---
+      rebuildTubes(tubeCount);
+      updateLight();
+
+      // --- Listeners ---
+      renderModeSelect.addEventListener('change', () => applyRenderMode());
+
+      packingSelect.addEventListener('change', layoutTubes);
+      spacingSlider.addEventListener('input', layoutTubes);
+
+      countSlider.addEventListener('input', () => {
+        rebuildTubes(parseInt(countSlider.value, 10));
+        lastHovered = null;
+      });
+
+      diameterSlider.addEventListener('input', () => {
+        tubeDiameter = parseFloat(diameterSlider.value);
+        diameterLabel.textContent = tubeDiameter.toFixed(2);
+        applyDiameter();
+      });
+
+      lightIntensitySlider.addEventListener('input', updateLight);
+      lightAzimuthSlider.addEventListener('input', updateLight);
+      lightElevationSlider.addEventListener('input', updateLight);
+
+      // --- Animation ---
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const globalRotX = parseFloat(rotXSlider.value);
+        const globalRotY = parseFloat(rotYSlider.value);
+        const globalRotZ = parseFloat(rotZSlider.value);
+        const globalScale = parseFloat(scaleSlider.value);
+        const interactionAmount = parseFloat(interactionSlider.value);
+
+        tubeGroup.rotation.set(globalRotX, globalRotY, globalRotZ);
+        tubeGroup.scale.setScalar(globalScale);
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(tubes, false);
+
+        for (const tube of tubes) {
+          tube.userData.hoverStrength *= 0.9;
+          tube.userData.phase += 0.03;
+
+          const travel = Math.sin(tube.userData.phase) * tube.userData.hoverStrength * interactionAmount;
+
+          tube.position.copy(tube.userData.basePosition);
+          tube.position.y += travel;
+
+          tube.rotation.y += 0.002;
+        }
+
+        if (intersects.length > 0) {
+          const hovered = intersects[0].object;
+          hovered.userData.hoverStrength += 0.4;
+
+          if (hovered !== lastHovered) {
+            playTone(hovered);
+            lastHovered = hovered;
+          }
+        } else {
+          lastHovered = null;
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    })();
+  </script>
 </body>
 </html>
